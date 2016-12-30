@@ -5,33 +5,46 @@ from toeic.models import Type, WordType,TestType, Level, Topic, GrammarTopic, Te
 
 class QuestionAdmin(admin.ModelAdmin):
     filter_horizontal = ('vocabs', 'topics')
+    # search_fields = ('name', 'description', 'keyword', )
 
 class VideoLessonAdmin(admin.ModelAdmin):
     filter_horizontal = ('vocabs','dictations', 'questions')
+    # search_fields = ('name', 'description', 'keyword', )
 
 class PronunciationLessonAdmin(admin.ModelAdmin):
     filter_horizontal = ('vocabs','dictations')
+    # search_fields = ('name', 'description', 'keyword', )
 
 class PassageAdmin(admin.ModelAdmin):
     filter_horizontal = ('vocabs', 'questions')
+    # search_fields = ('name', 'description', 'keyword', )
 
 class DicationAdmin(admin.ModelAdmin):
     filter_horizontal = ('vocabs',)
+    # search_fields = ('name', 'description', 'keyword', )
 
 class SpeakingQuestionAdmin(admin.ModelAdmin):
     filter_horizontal = ('vocabs','speakinganswer',)
+    search_fields = ('text', )
 
 class SpeakingAnswerAdmin(admin.ModelAdmin):
     filter_horizontal = ('vocabs',)
+    # search_fields = ('text',)
 
 class SpeakingLessonAdmin(admin.ModelAdmin):
     filter_horizontal = ('questions', 'vocabs')
+    # search_fields = ('name', 'description', 'keyword', )
 
 class SpeakingTopicAdmin(admin.ModelAdmin):
     filter_horizontal = ('testset',)
+    # search_fields = ('name', 'description', 'keyword', )
 
 class SpeakingPracticeAdmin(admin.ModelAdmin):
     filter_horizontal = ('questions','answers')
+    # search_fields = ('name', 'description', 'keyword', )
+
+# class VocabAdmin(admin.ModelAdmin):
+    # search_fields = ('name', 'description', 'keyword', )
 
 admin.site.register(Type)
 admin.site.register(WordType)

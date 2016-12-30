@@ -6,11 +6,12 @@ from . import views
 urlpatterns = [
 	#homepage
 	url(r'^$', views.index, name='index'),
+	url(r'^dashboard/$', views.dashboard, name='dashboard'),
 	url(r'^vocabs/(?P<vocab_id>\d+)$', views.vocab, name='vocab'),
 	url(r'^tests/$', views.tests, name='tests'),
 	url(r'^tests/practice$', views.practicetests, name='practicetests'),
 	url(r'^tests/(?P<test_id>\d+)/$', views.test, name='test'),
-	url(r'^tests/result/(?P<test_id>\d+)/$', views.resulttest, name='resulttest'),
+	url(r'^tests/result/(?P<test_id>\d+)/(?P<session_id>\d+)/$', views.resulttest, name='resulttest'),
 	url(r'^tests/resultvocabtest/(?P<test_id>\d+)/$', views.resultvocabtest, name='resultvocabtest'),
 	url(r'^tests/checkvocabtest/(?P<test_id>\d+)/$', views.checkvocabtest, name='checkvocabtest'),
 	url(r'^topics/$', views.topics, name='topics'),

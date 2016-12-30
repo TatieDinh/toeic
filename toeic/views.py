@@ -1,14 +1,24 @@
 # Create your views here.
+
+#import division
+from __future__ import division
+
+# import datetime
+from django.utils import timezone
 import operator
 from collections import OrderedDict
 from django.shortcuts import render
-from .models import Topic, Test, Question, Answer, Vocab, UserVocab, UserAnswer, GrammarTopic, UserAnswerGrammarQuiz, UserAnswerVideoLesson, UserDictation, VideoLesson, Dictation, PronunciationLesson, SpeakingAnswer, SpeakingQuestion, SpeakingTopic, SpeakingLesson, SpeakingPractice
+from .models import Topic, Test, Question, Answer, Vocab, UserVocab, UserAnswer, UserTest, GrammarTopic, UserAnswerGrammarQuiz, UserAnswerVideoLesson, UserDictation, VideoLesson, Dictation, PronunciationLesson, SpeakingAnswer, SpeakingQuestion, SpeakingTopic, SpeakingLesson, SpeakingPractice
 from django.http import HttpResponseRedirect
 from django.core.urlresolvers import reverse
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.forms import UserCreationForm
 from .form import UserVocabForm, UserDictationForm, UserAnswerForm, UserAnswerGrammarQuizForm, SearchForm
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.utils.dateparse import parse_date
+
+#import for db query
+from django.db.models import Count, Max, Avg, Min, F, FloatField, Sum
 
 # Create your views here.
 def index(request):
@@ -222,44 +232,71 @@ def resultvocabtest(request, test_id):
 def test(request, test_id):
     test = Test.objects.get(id=test_id)
     questions = test.question_set.all()
+    number_of_questions = questions.count()
     questions_dict = OrderedDict()
     if request.user.is_authenticated():
         currentUser = request.user
     else:
         return HttpResponseRedirect(reverse('toeic:index'))
 
+    if "start" in request.session:
+        start = request.session["start"]
+    else:
+        start = timezone.now()
+        request.session["start"] = start
+
     if request.method != 'POST':
         for question in questions:
             form = UserAnswerForm(question.id, prefix=question.id)
             questions_dict[question] = form
     else:
+        finish = timezone.now()
         try:
-            lastanswer = UserAnswer.objects.filter(user = currentUser.id).latest("date_added")
-            session = lastanswer.session + 1
-        except UserAnswer.DoesNotExist:
+            last_user = UserTest.objects.latest("session")
+            session = last_user.session + 1
+        except UserTest.DoesNotExist:
             session = 1
-
+        score = 0
+        new_userTest = UserTest()
+        new_userTest.session = session
+        new_userTest.test = test
+        new_userTest.user = currentUser
+        new_userTest.save(force_insert=True)
         for question in questions:
+            iscorrect = False
             form = UserAnswerForm(question.id, request.POST, prefix=question.id)
-            question_id = question.id
             if form.is_valid():
+                useranswer = form.cleaned_data['answer']
+                question_id = question.id
+                answers = question.answer_set.all()
+                for answer in answers:
+                    if answer.istrue == True and useranswer == answer:
+                        iscorrect = True
+                        score = score + 1
                 new_useranswer = UserAnswer()
+                new_useranswer.usertest = new_userTest
                 new_useranswer.session = session
                 new_useranswer.user = currentUser
                 new_useranswer.question = question
                 new_useranswer.test = test
-                new_useranswer.answer = form.cleaned_data['answer']
+                new_useranswer.answer = useranswer
+                new_useranswer.is_correct = iscorrect
                 new_useranswer.save(force_insert=True)
+                request.session[question_id] = useranswer
 
-                request.session[question_id] = form.cleaned_data['answer']
-            else:
-                request.session[question_id] = 'unknown'
-        return HttpResponseRedirect(reverse('toeic:resulttest', args=[test.id]))
+        new_userTest.score = score
+        new_userTest.percentage = score/(number_of_questions * 1.0)
+        new_userTest.start = request.session["start"]
+        del request.session["start"]
+        new_userTest.finish = finish
+        new_userTest.save()
+
+        return HttpResponseRedirect(reverse('toeic:resulttest', kwargs={'test_id':test.id,'session_id': session}))
 
     context = {'test': test, 'questions':questions_dict}
     return render(request, 'toeic/test.html', context)
 
-def resulttest(request, test_id):
+def resulttest(request, test_id, session_id):
     test = Test.objects.get(id=test_id)
     questions = test.question_set.all()
     questions_dict = OrderedDict()
@@ -270,54 +307,85 @@ def resulttest(request, test_id):
     else:
         return HttpResponseRedirect(reverse('toeic:index'))
 
-    try:
-        lastanswer = UserAnswer.objects.filter(user = currentUser.id).latest("date_added")
-        session = lastanswer.session
-        for question in questions:
-            # if UserAnswer.objects.filter(user = currentUser.id).filter(session = session).filter(question = question.id).exists():
-            #     user_useranswer = UserAnswer.objects.filter(user = currentUser.id).filter(session = session).filter(question = question.id).latest("date_added")
-            #     useranswer = user_useranswer.answer.text
-            # else:
-            #     useranswer = "Unknown"
-            question_id = question.id
-            if question_id in request.session:
-                useranswer = request.session.get(question_id)
-                del request.session[question_id]
-            else:
-                useranswer = 'unknown'
-            answers = question.answer_set.all()
-            for answer in answers:
-                if answer.istrue == True and useranswer == answer.text:
-                    iscorrect = True
-                    rightanswers += 1
-            grammar = GrammarTopic.objects.filter(question = question)
-            vocabs = question.vocabs.all()
-            questions_dict[question] = []
-            questions_dict[question].append(answers)
-            questions_dict[question].append(useranswer)
-            questions_dict[question].append(grammar)
-            questions_dict[question].append(iscorrect)
-            questions_dict[question].append(vocabs)
-            iscorrect = False
-
-    except UserAnswer.DoesNotExist:
-        for question in questions:
-            useranswer = "Unknown"
-            answers = question.answer_set.all()
-            grammar = GrammarTopic.objects.filter(question = question)
-            vocabs = GrammarTopic.objects.filter(question = question)
-            questions_dict[question] = []
-            questions_dict[question].append(answers)
-            questions_dict[question].append(useranswer)
-            questions_dict[question].append(grammar)
-            questions_dict[question].append(iscorrect)
-            questions_dict[question].append(vocabs)
-            iscorrect = False
-
+    for question in questions:
+        # if UserAnswer.objects.filter(user = currentUser.id).filter(session = session_id).filter(question = question.id).exists():
+        #     user_useranswer = UserAnswer.objects.filter(user = currentUser.id).filter(session = session_id).filter(question = question.id)
+        #     useranswer = user_useranswer.answer.text
+        # else:
+        #     useranswer = "Unknown"
+        question_id = question.id
+        if question_id in request.session:
+            useranswer = request.session.get(question_id)
+            del request.session[question_id]
+        else:
+            useranswer = 'unknown'
+        answers = question.answer_set.all()
+        for answer in answers:
+            if answer.istrue == True and useranswer == answer:
+                iscorrect = True
+                rightanswers += 1
+        grammar = GrammarTopic.objects.filter(question = question)
+        vocabs = question.vocabs.all()
+        questions_dict[question] = []
+        questions_dict[question].append(answers)
+        questions_dict[question].append(useranswer)
+        questions_dict[question].append(grammar)
+        questions_dict[question].append(iscorrect)
+        questions_dict[question].append(vocabs)
+        iscorrect = False
 
     context = {'test': test, 'questions':questions_dict, 'rightanswers':rightanswers}
     return render(request, 'toeic/resulttest.html', context)
 
+def dashboard(request):
+    if request.user.is_authenticated():
+        currentUser = request.user
+    else:
+        return HttpResponseRedirect(reverse('toeic:index'))
+    #query all grammar topics
+    all_grammar_topics = GrammarTopic.objects.all()
+    weak_topics =  OrderedDict()
+    for each in all_grammar_topics:
+        weak_topics[each] = 0
+
+    # query all the questions user has done
+    all_questions_done = UserAnswer.objects.filter(user = currentUser)
+    # query the latest versions of the questions user has done
+    all_latest_questions_done = all_questions_done.values('question_id').annotate(id=Max('id'))
+
+    total_wrong_answers = 0
+    for question_done in all_latest_questions_done:
+        if UserAnswer.objects.get(id=question_done['id']).is_correct == False:
+            total_wrong_answers = total_wrong_answers + 1
+            question = Question.objects.get(id=question_done['question_id'])
+            grammar_topics = question.grammartopics.all()
+            for grammar_topic in grammar_topics:
+                weak_topics[grammar_topic] = weak_topics[grammar_topic] + 1
+
+    # query all tests
+    all_tests = Test.objects.all()
+    # query all the tests user has done
+    all_tests_done = UserTest.objects.filter(user = currentUser)
+    # query the latest versions of the tests user has done
+    all_latest_tests_done = all_tests_done.values('test_id').annotate(id=Max('id')).order_by('date_added')
+    tests_done = []
+    highest_score = 0
+    highest_percentage = 0
+    total_percentage = 0
+    for test_done in all_latest_tests_done:
+        test = UserTest.objects.get(id=test_done['id'])
+        if test.score > highest_score:
+            highest_score = test.score
+        if test.percentage > highest_percentage:
+            highest_percentage = test.percentage
+        total_percentage = total_percentage + test.percentage
+        tests_done.append(test)
+    number_tests = all_tests.count()
+    number_tests_finished = len(tests_done)
+    average_percentage = total_percentage/ number_tests_finished
+
+    context = {'total_wrong_answers':total_wrong_answers, 'weak_topics':weak_topics,'tests_done': tests_done, 'number_tests':number_tests, 'number_tests_finished':number_tests_finished, 'highest_score': highest_score, 'highest_percentage': highest_percentage, 'average_percentage': average_percentage}
+    return render(request, 'toeic/dashboard.html', context)
 
 def logout_view(request):
     logout(request)
@@ -365,23 +433,12 @@ def grammartopicquiz(request, grammartopic_id):
             form = UserAnswerForm(question.id, prefix=question.id)
             questions_dict[question] = form
     else:
-        try:
-            lastanswer = UserAnswerGrammarQuiz.objects.filter(user = currentUser.id).latest("date_added")
-            session = lastanswer.session + 1
-        except UserAnswer.DoesNotExist:
-            session = 1
-
         for question in questions:
             form = UserAnswerForm(question.id, request.POST, prefix=question.id)
             if form.is_valid():
-                new_useranswer = UserAnswerGrammarQuiz()
-                new_useranswer.user = currentUser
-                new_useranswer.session = session
-                new_useranswer.question = question
-                new_useranswer.grammartopic = grammartopic
-                new_useranswer.answer = form.cleaned_data['answer']
-                new_useranswer.save(force_insert=True)
-            questions_dict[question] = form
+                useranswer = form.cleaned_data['answer']
+                question_id = question.id
+                request.session[question_id] = useranswer
 
         return HttpResponseRedirect(reverse('toeic:resultgrammartopicquiz', args=[grammartopic.id]))
 
@@ -399,46 +456,29 @@ def resultgrammartopicquiz(request, grammartopic_id):
     else:
         return HttpResponseRedirect(reverse('toeic:index'))
 
-    try:
-        lastanswer = UserAnswerGrammarQuiz.objects.filter(user = currentUser.id).latest("date_added")
-        session = lastanswer.session
+    for question in questions:
+        question_id = question.id
+        if question_id in request.session:
+            useranswer = request.session.get(question_id)
+            del request.session[question_id]
+        else:
+            useranswer = 'unknown'
+        answers = question.answer_set.all()
+        for answer in answers:
+            if answer.istrue == True and useranswer == answer:
+                iscorrect = True
+                rightanswers += 1
+        grammar = GrammarTopic.objects.filter(question = question)
+        vocabs = question.vocabs.all()
+        questions_dict[question] = []
+        questions_dict[question].append(answers)
+        questions_dict[question].append(useranswer)
+        questions_dict[question].append(grammar)
+        questions_dict[question].append(iscorrect)
+        questions_dict[question].append(vocabs)
+        iscorrect = False
 
-        for question in questions:
-            if UserAnswerGrammarQuiz.objects.filter(user = currentUser.id).filter(session = session).filter(question = question.id).exists():
-                user_useranswer = UserAnswerGrammarQuiz.objects.filter(user = currentUser.id).filter(session = session).filter(question = question.id).latest("date_added")
-                useranswer = user_useranswer.answer.text
-            else:
-                useranswer = "Unknown"
-            answers = question.answer_set.all()
-            for answer in answers:
-                if answer.istrue == True and useranswer == answer.text:
-                    iscorrect = True
-                    rightanswers += 1
-            grammar = GrammarTopic.objects.filter(question = question)
-            vocabs = GrammarTopic.objects.filter(question = question)
-            questions_dict[question] = []
-            questions_dict[question].append(answers)
-            questions_dict[question].append(useranswer)
-            questions_dict[question].append(grammar)
-            questions_dict[question].append(iscorrect)
-            questions_dict[question].append(vocabs)
-            iscorrect = False
-
-    except UserAnswerGrammarQuiz.DoesNotExist:
-        for question in questions:
-            useranswer = "Unknown"
-            answers = question.answer_set.all()
-            grammar = GrammarTopic.objects.filter(question = question)
-            vocabs = GrammarTopic.objects.filter(question = question)
-            questions_dict[question] = []
-            questions_dict[question].append(answers)
-            questions_dict[question].append(useranswer)
-            questions_dict[question].append(grammar)
-            questions_dict[question].append(iscorrect)
-            questions_dict[question].append(vocabs)
-            iscorrect = False
-
-    context = {'grammartopic': grammartopic, 'questions':questions_dict}
+    context = {'grammartopic': grammartopic, 'questions':questions_dict, 'rightanswers':rightanswers}
     return render(request, 'toeic/resultgrammartopicquiz.html', context)
 
 def toeicpart3videos(request):

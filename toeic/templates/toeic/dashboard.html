@@ -1,0 +1,64 @@
+{% extends "toeic/base.html" %}
+
+{% block content %}
+
+<div class ="container">
+<div class="row">
+    <div class="box">
+        <div class="col-lg-12">
+            <hr>
+            <h2 class="intro-text text-center">
+                <strong>Dashboard</strong>
+            </h2>
+            <hr>
+    	</div>
+    	<div class="col-lg-12">
+    	     <div class ="text-center">
+    	        {% if total_wrong_answers == 0 %}
+    	        You have no wrong answers.
+    	        {% else %}
+    	        This piechart shows the grammar topics and the number of wrong anwers for each topic:
+                <div id="piechart" style="width: 900px; height: 500px;"></div>
+                {% endif %}
+                <ol>
+                Choose a topic to improve
+				{% for topic, weakness in weak_topics.iteritems %}
+					<li>
+					<a href="{% url 'toeic:grammartopic' topic.id %}">{{ topic.engtitle }}</a>
+					</li>
+				{% empty %}
+					<li>Data not available</li>
+				{% endfor %}
+				 </ol>
+
+			</div>
+    	</div>
+    </div>
+</div>
+</div>
+
+<script type="text/javascript">
+      google.charts.load('current', {'packages':['corechart']});
+      google.charts.setOnLoadCallback(drawChart);
+      function drawChart() {
+
+        var data = google.visualization.arrayToDataTable([
+            ['Grammar Topic', 'Weak points'],
+    	{% for topic, weakness in weak_topics.iteritems %}
+			['{{ topic|safe }}',     {{weakness}}],
+    		{% empty %}
+    		['Data not available',      2]
+    		{% endfor %}
+        ]);
+
+        var options = {
+          title: 'Grammar Weakness',
+          backgroundColor: 'transparent',
+        };
+
+        var chart = new google.visualization.PieChart(document.getElementById('piechart'));
+
+        chart.draw(data, options);
+      }
+    </script>
+{% endblock content %}

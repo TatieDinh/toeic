@@ -12,7 +12,8 @@
             <hr>
         </div>
         <div class="col-lg-12">
-            <form method="Post"/>
+            <div id="countdown"></div>
+            <form method="Post" id='form'/>
 			<table class="table">
 				{% for question, form in questions.iteritems %}
 					<tr>
@@ -23,11 +24,61 @@
 					<tr>No questions have been added yet.</tr>
 				{% endfor %}
 			</table>
-			<div class ="text-center"><button class="btn btn-danger" name="submit">Submit</button></div>
+			<div class ="text-center"><button id="submit_button" class="btn btn-danger">Submit</button></div>
 			</form>
         </div>
    </div>
 </div>
 </div>
+
+<!--<script type="text/javascript">
+    $(document).ready(function() {
+        //time to count down
+        // sessionStorage.removeItem("endTime{{test.id}}");
+        var max_time = 60000 * 1;
+        var startTime = new Date();
+        if (sessionStorage.endTime{{test.id}}){
+            var endTime = new Date();
+            endTime.setTime(sessionStorage.endTime{{test.id}});
+        }else{
+            var endTime = new Date();
+            endTime.setTime(startTime.getTime() + max_time);
+            sessionStorage.endTime{{test.id}} = endTime.getTime();
+        }
+
+        //function to update counter
+        function update(){
+            var currentTime = new Date();
+
+            var remainingTime = endTime.getTime()-currentTime.getTime();
+            var hours = parseInt(remainingTime / 3600000);
+            var minutes = parseInt((remainingTime % 3600000) / 60000);
+            var seconds = parseInt((((remainingTime % 3600000) % 60000) / 1000));
+            $("#countdown").text(hours.toString() + ":" + minutes.toString() + ":" + seconds.toString());
+            // $("#countdown").text(currentTime.getHours()+":"+currentTime.getMinutes()+":"+currentTime.getSeconds()+";"+endTime.getHours()+":"+endTime.getMinutes()+":"+endTime.getSeconds()+";"+ remainingTime.getHours()+":"+remainingTime.getMinutes()+":"+remainingTime.getSeconds());
+
+            //check if time's up
+            if(remainingTime < 0){
+                sessionStorage.removeItem("endTime{{test.id}}");
+                // document.getElementById("submit_button").click();
+                document.getElementById("form").submit();
+            }
+            else{
+            //call itself every second
+            setTimeout(update,1000);
+            }
+        }
+
+        document.getElementById('submit_button').onclick = reset;
+
+        function reset(){
+            sessionStorage.removeItem("endTime{{test.id}}");
+            document.getElementById("form").submit();
+        }
+
+        //start the countdown
+        update();
+    });
+</script>-->
 
 {% endblock content %}

@@ -1,7 +1,8 @@
 from __future__ import unicode_literals
 
 from django.db import models
-from tinymce.models import HTMLField
+from django.utils import timezone
+# from tinymce.models import HTMLField
 from django.contrib.auth.models import User
 from ckeditor.fields import RichTextField
 
@@ -67,7 +68,7 @@ class GrammarTopic(models.Model):
 class ListeningTopic(models.Model):
     level= models.ForeignKey(Level)
     title = models.CharField(max_length=200, default="")
-    text = HTMLField(blank=True, null=True)
+    text = RichTextField(blank=True, null=True)
     date_added = models.DateTimeField(auto_now_add=True)
 
     def __unicode__(self):
@@ -82,7 +83,7 @@ class Vocab(models.Model):
     date_added = models.DateTimeField(auto_now_add=True)
     past_tense = models.CharField(max_length=50, blank=True, null=True)
     pasticiple = models.CharField(max_length=50, blank=True, null=True)
-    main_form = HTMLField(blank=True, null=True)
+    main_form = RichTextField(blank=True, null=True)
     other_form = models.CharField(max_length=200, blank=True, null=True)
     topic = models.ManyToManyField(Topic)
     image = models.FileField(upload_to="images/vocabs",blank=True, null=True)
@@ -122,7 +123,7 @@ class Question(models.Model):
 class Passage(models.Model):
     level= models.ForeignKey(Level)
     title = models.CharField(max_length=200, default = "")
-    text = HTMLField(blank=True, null=True)
+    text = RichTextField(blank=True, null=True)
     vocabs = models.ManyToManyField(Vocab,blank=True, null=True)
     topics = models.ManyToManyField(Topic, blank=True, null=True)
     istestsix = models.BooleanField(default=False)
@@ -181,17 +182,36 @@ class Answer(models.Model):
     def __unicode__(self):
         return self.text
 
-class UserAnswer(models.Model):
+class UserTest(models.Model):
     session = models.IntegerField(default = 1, blank=True, null=True)
-    user = models.ForeignKey(User)
     test = models.ForeignKey(Test)
-    question = models.ForeignKey(Question)
-    answer = models.ForeignKey(Answer)
+    user = models.ForeignKey(User)
+    percentage = models.DecimalField(default = 0, max_digits=5, decimal_places=2)
+    score = models.IntegerField(default = 0, blank=True, null=True)
+    start = models.DateTimeField(default=timezone.now, blank=True)
+    finish = models.DateTimeField(default=timezone.now, blank=True)
+
+    def get_duration(self):
+        return self.finish - self.start
 
     date_added = models.DateTimeField(auto_now_add=True)
 
     def __unicode__(self):
-        return self.answer
+        return self.score
+
+class UserAnswer(models.Model):
+    session = models.IntegerField(default = 1, blank=True, null=True)
+    usertest = models.ForeignKey(UserTest, null=True)
+    user = models.ForeignKey(User)
+    test = models.ForeignKey(Test)
+    question = models.ForeignKey(Question)
+    answer = models.ForeignKey(Answer)
+    is_correct = models.BooleanField(default = True)
+
+    date_added = models.DateTimeField(auto_now_add=True)
+
+    def __unicode__(self):
+        return str(self.answer)
 
 class UserAnswerVideoLesson(models.Model):
     session = models.IntegerField(default = 1, blank=True, null=True)
